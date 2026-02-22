@@ -77,7 +77,7 @@ namespace AppCore.EntityModels
         public DateTime? CompletedAtUtc { get; set; }
         public string? Error { get; set; }
 
-        public DocumentResult? Result { get; set; }
+        //public DocumentResult? Result { get; set; }
     }
 
     public partial class DocumentResult
@@ -89,6 +89,6 @@ namespace AppCore.EntityModels
         public string? TimingsJson { get; set; }
         public DateTime CreatedAtUtc { get; set; } = DateTime.UtcNow;
 
-        public DocumentJob Job { get; set; } = default!;
+        //public DocumentJob Job { get; set; } = default!;
     }
 }

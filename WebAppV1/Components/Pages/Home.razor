@@ -27,15 +27,22 @@ Welcome to your new app.
         await Task.Delay(100);
         CancellationToken ctn = new CancellationToken();
 
-        List<string> documentids = new List<string>();
-        documentids.Add("639066");
+        try
+        {
+            List<string> documentids = new List<string>();
+            documentids.Add("639066");
 
-        // test log
-        //await _audit.AddLogAsync(0, 1, "Home- test logging", AuditLogLevel.Info, AuditEventType.Testing);
+            // test log
+            await _audit.AddLogAsync(0, 1, $"Home- test logging at: {DateTime.Now.ToString()}", AuditLogLevel.Info, AuditEventType.Testing);
 
-        // get messages from inbox
-        var messages = await _email.FetchInboxMessagesAsync(ctn);
-
+            // get messages from inbox
+            //var messages = await _email.FetchInboxMessagesAsync(ctn);
+        }
+        catch(Exception ex)
+        {
+            Console.WriteLine(ex.ToString());
+        }
+    
     }
 
 }

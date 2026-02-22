@@ -93,8 +93,8 @@ public partial class AppDbContext : DbContext
     public DbSet<DocumentJob> DocumentJobs => Set<DocumentJob>();
     public DbSet<DocumentResult> DocumentResults => Set<DocumentResult>();
 
-    protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
-        => optionsBuilder.UseSqlServer("Server=WLF1N1TAZSQLCLU.wlife.com.au;Database=IDPDEV;User Id=ARSUser;Password=hjytu73k48jk23!;TrustServerCertificate=True;");
+    //protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
+    //    => optionsBuilder.UseSqlServer("Server=WLF1N1TAZSQLCLU.wlife.com.au;Database=IDPDEV;User Id=ARSUser;Password=hjytu73k48jk23!;TrustServerCertificate=True;");
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -899,34 +899,41 @@ public partial class AppDbContext : DbContext
 
         modelBuilder.Entity<Prompt>(entity =>
         {
+            entity.HasKey(e => e.PromptId);
             entity.ToTable("Prompts");
         });
 
         modelBuilder.Entity<ModelEndpoint>(entity =>
         {
+            entity.HasKey(e => e.EndpointId);
             entity.ToTable("ModelEndpoints");
         });
 
         modelBuilder.Entity<WorktypeCatalog>(entity =>
         {
+            entity.HasKey(e => e.CatalogId);
             entity.ToTable("WorktypeCatalogs");
         });
         modelBuilder.Entity<PhraseOverride>(entity =>
         {
+            entity.HasKey(e => e.OverrideId);
             entity.ToTable("PhraseOverrides");
         });
         modelBuilder.Entity<CheckboxFlagRule>(entity =>
         {
+            entity.HasKey(e => e.RuleId);
             entity.ToTable("CheckboxFlagRules");
         });
 
         modelBuilder.Entity<DocumentJob>(entity =>
         {
+            entity.HasKey(e => e.JobId);
             entity.ToTable("DocumentJobs");
         });
 
         modelBuilder.Entity<DocumentResult>(entity =>
         {
+            entity.HasKey(e => e.JobId);
             entity.ToTable("DocumentResults");
         });
 
