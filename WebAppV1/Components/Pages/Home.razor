@@ -1,0 +1,41 @@
+﻿@page "/"
+@using AppCore.Helper
+@using AppCore.Interfaces
+@using AppCore.Models
+@using AppCore.EntityModels
+@using AppCore.Services
+@inject IArsAutomationAgent _playright
+@inject IIDPAuditLogRepository _audit;
+@inject IEmailSerivce _email;
+@inject IConfiguration _configuration
+@inject IJSRuntime JS
+@inject NavigationManager Nav
+@rendermode @(new InteractiveServerRenderMode(prerender: false))
+
+<PageTitle>Home</PageTitle>
+
+<h1>Hello, world!</h1>
+
+Welcome to your new app.
+
+@code {
+
+    protected override async Task OnInitializedAsync() => await LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        await Task.Delay(100);
+        CancellationToken ctn = new CancellationToken();
+
+        List<string> documentids = new List<string>();
+        documentids.Add("639066");
+
+        // test log
+        //await _audit.AddLogAsync(0, 1, "Home- test logging", AuditLogLevel.Info, AuditEventType.Testing);
+
+        // get messages from inbox
+        var messages = await _email.FetchInboxMessagesAsync(ctn);
+
+    }
+
+}
