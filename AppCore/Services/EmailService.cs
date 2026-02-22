@@ -27,7 +27,7 @@ namespace AppCore.Services
 
             var tenantId = _cfg["EmailClientCredentials:TenantId"]!;
             var clientId = _cfg["EmailClientCredentials:ClientId"]!;
-            var clientSecret = _cfg["EmailClientCredentials:ClientHide"]!;
+            var clientSecret = "V6Q8Q~hM3rc7ku7j9PGuBaB2ll6Fq0tTLPwgkaqr"; //_cfg["EmailClientCredentials:ClientHide"]!;
             _sourceEmailAddress = _cfg["EmailUserCredentials:Username"]!;
 
             var credential = new ClientSecretCredential(tenantId, clientId, clientSecret);
