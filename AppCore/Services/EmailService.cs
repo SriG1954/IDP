@@ -25,10 +25,11 @@ namespace AppCore.Services
             _cfg = cfg;
             _audit = audit;
 
-            var tenantId = _cfg["EmailClientCredentials:TenantId"]!;
-            var clientId = _cfg["EmailClientCredentials:ClientId"]!;
-            var clientSecret = "V6Q8Q~hM3rc7ku7j9PGuBaB2ll6Fq0tTLPwgkaqr"; //_cfg["EmailClientCredentials:ClientHide"]!;
-            _sourceEmailAddress = _cfg["EmailUserCredentials:Username"]!;
+            var mailConfig = _db.MailboxConfigs.FirstOrDefault();
+            var tenantId = mailConfig!.TenantId!;
+            var clientId = mailConfig!.ClientId!;
+            var clientSecret = mailConfig!.ClientSecret!;
+            _sourceEmailAddress = mailConfig!.MailboxAddress!;
 
             var credential = new ClientSecretCredential(tenantId, clientId, clientSecret);
             _graph = new GraphServiceClient(credential);
