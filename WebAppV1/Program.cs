@@ -57,6 +57,8 @@ builder.Services.AddScoped<IArsAutomationAgent, ArsAutomationAgent>();
 // IDPAuditLog Repository
 builder.Services.AddScoped<IIDPAuditLogRepository, IDPAuditLogRepository>();
 
+builder.Services.AddScoped<IMailMessageRepository, MailMessageRepository>();
+
 // Email Service
 builder.Services.AddScoped<IEmailSerivce, EmailService>();
 

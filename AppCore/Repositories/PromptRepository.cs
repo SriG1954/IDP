@@ -15,7 +15,7 @@ namespace AppCore.Repositories
 
         public PromptRepository(AppDbContext context, IMemoryCache cache) { _context = context; _cache = cache; }
 
-        public async Task<PaginatedList<Prompt>> SearchAsync(string column, string search, int pageIndex = 1, int pageSize = 25)
+        public async Task<PaginatedList<Prompt1>> SearchAsync(string column, string search, int pageIndex = 1, int pageSize = 25)
         {
             var query = _context.Prompts.AsQueryable();
 
@@ -27,39 +27,39 @@ namespace AppCore.Repositories
                 var propertyAsString = Expression.Call(property, toStringMethod!);
                 var containsMethod = typeof(string).GetMethod("Contains", new[] { typeof(string) });
                 var searchExpression = Expression.Call(propertyAsString, containsMethod!, Expression.Constant(search));
-                var lambda = Expression.Lambda<Func<Prompt, bool>>(searchExpression, parameter);
+                var lambda = Expression.Lambda<Func<Prompt1, bool>>(searchExpression, parameter);
 
                 query = query.Where(lambda);
             }
 
-            return await PaginatedList<Prompt>.CreateAsync(query, pageIndex, pageSize);
+            return await PaginatedList<Prompt1>.CreateAsync(query, pageIndex, pageSize);
         }
 
-        public async Task<Prompt?> GetAsync(string skey)
+        public async Task<Prompt1?> GetAsync(string skey)
         {
             return await _context.Prompts.FindAsync(skey);
         }
 
-        public async Task<Prompt?> GetAsync(int skey)
+        public async Task<Prompt1?> GetAsync(int skey)
         {
             return await _context.Prompts.FindAsync(skey);
         }
 
-        public async Task<Prompt> AddAsync(Prompt model)
+        public async Task<Prompt1> AddAsync(Prompt1 model)
         {
             await _context.Prompts.AddAsync(model);
             await _context.SaveChangesAsync();
             return model;
         }
 
-        public async Task<Prompt> UpdateAsync(Prompt model)
+        public async Task<Prompt1> UpdateAsync(Prompt1 model)
         {
             _context.Prompts.Update(model);
             await _context.SaveChangesAsync();
             return model;
         }
 
-        public async Task<Prompt> DeleteAsync(Prompt model)
+        public async Task<Prompt1> DeleteAsync(Prompt1 model)
         {
             _context.Prompts.Remove(model);
             await _context.SaveChangesAsync();

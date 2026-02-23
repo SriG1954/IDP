@@ -6,7 +6,7 @@ using System.Linq.Expressions;
 
 namespace AppCore.Repositories
 {
-    public class MailMessageRepository : ISQLRepository<MailMessage>, IMailMessageRepository
+    public class MailMessageRepository : ISQLRepository<MailMessage1>, IMailMessageRepository
     {
         private readonly AppDbContext _context;
 
@@ -15,7 +15,7 @@ namespace AppCore.Repositories
             _context = context;
         }
 
-        public async Task<PaginatedList<MailMessage>> SearchAsync(string column, string search, int pageIndex = 1, int pageSize = 25)
+        public async Task<PaginatedList<MailMessage1>> SearchAsync(string column, string search, int pageIndex = 1, int pageSize = 25)
         {
             var query = _context.MailMessages.AsQueryable();
 
@@ -27,39 +27,48 @@ namespace AppCore.Repositories
                 var propertyAsString = Expression.Call(property, toStringMethod!);
                 var containsMethod = typeof(string).GetMethod("Contains", new[] { typeof(string) });
                 var searchExpression = Expression.Call(propertyAsString, containsMethod!, Expression.Constant(search));
-                var lambda = Expression.Lambda<Func<MailMessage, bool>>(searchExpression, parameter);
+                var lambda = Expression.Lambda<Func<MailMessage1, bool>>(searchExpression, parameter);
 
                 query = query.Where(lambda);
             }
 
-            return await PaginatedList<MailMessage>.CreateAsync(query, pageIndex, pageSize);
+            return await PaginatedList<MailMessage1>.CreateAsync(query, pageIndex, pageSize);
         }
 
-        public async Task<MailMessage?> GetAsync(string skey)
+        public async Task<MailMessage1?> GetAsync(string skey)
         {
             return await _context.MailMessages.FindAsync(skey);
         }
 
-        public async Task<MailMessage?> GetAsync(int skey)
+        public async Task<MailMessage1?> GetAsync(int skey)
         {
             return await _context.MailMessages.FindAsync(skey);
         }
 
-        public async Task<MailMessage> AddAsync(MailMessage model)
+        public async Task<MailMessage1> AddAsync(MailMessage1 model)
         {
-            await _context.MailMessages.AddAsync(model);
-            await _context.SaveChangesAsync();
+            try
+            {
+                
+                await _context.MailMessages.AddAsync(model);
+                await _context.SaveChangesAsync();
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine(ex.ToString());
+            }
+
             return model;
         }
 
-        public async Task<MailMessage> UpdateAsync(MailMessage model)
+        public async Task<MailMessage1> UpdateAsync(MailMessage1 model)
         {
             _context.MailMessages.Update(model);
             await _context.SaveChangesAsync();
             return model;
         }
 
-        public async Task<MailMessage> DeleteAsync(MailMessage model)
+        public async Task<MailMessage1> DeleteAsync(MailMessage1 model)
         {
             _context.MailMessages.Remove(model);
             await _context.SaveChangesAsync();

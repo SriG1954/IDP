@@ -1,5 +1,6 @@
 ﻿using AppCore.EntityModels;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Graph.Models;
 using System;
 using System.Collections.Generic;
 using System.Net.Mail;
@@ -53,7 +54,7 @@ public partial class AppDbContext : DbContext
 
     public virtual DbSet<MailClaimNumber> MailClaimNumbers { get; set; }
 
-    public DbSet<EntityModels.MailMessage> MailMessages => Set<EntityModels.MailMessage>();
+    public DbSet<MailMessage1> MailMessages => Set<MailMessage1>();
     public DbSet<MailHeader> MailHeaders => Set<MailHeader>();
     public DbSet<MailRecipient> MailRecipients => Set<MailRecipient>();
     public DbSet<MailAttachment> MailAttachments => Set<MailAttachment>();
@@ -85,13 +86,13 @@ public partial class AppDbContext : DbContext
 
     public virtual DbSet<TextractBlock> TextractBlocks { get; set; }
 
-    public DbSet<Prompt> Prompts => Set<Prompt>();
-    public DbSet<ModelEndpoint> ModelEndpoints => Set<ModelEndpoint>();
-    public DbSet<WorktypeCatalog> WorktypeCatalogs => Set<WorktypeCatalog>();
-    public DbSet<PhraseOverride> PhraseOverrides => Set<PhraseOverride>();
-    public DbSet<CheckboxFlagRule> CheckboxFlagRules => Set<CheckboxFlagRule>();
-    public DbSet<DocumentJob> DocumentJobs => Set<DocumentJob>();
-    public DbSet<DocumentResult> DocumentResults => Set<DocumentResult>();
+    public virtual DbSet<Prompt1> Prompts => Set<Prompt1>();
+    public virtual DbSet<ModelEndpoint> ModelEndpoints => Set<ModelEndpoint>();
+    public virtual DbSet<WorktypeCatalog> WorktypeCatalogs => Set<WorktypeCatalog>();
+    public virtual DbSet<PhraseOverride> PhraseOverrides => Set<PhraseOverride>();
+    public virtual DbSet<CheckboxFlagRule> CheckboxFlagRules => Set<CheckboxFlagRule>();
+    public virtual DbSet<DocumentJob> DocumentJobs => Set<DocumentJob>();
+    public virtual DbSet<DocumentResult> DocumentResults => Set<DocumentResult>();
 
     //protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
     //    => optionsBuilder.UseSqlServer("Server=WLF1N1TAZSQLCLU.wlife.com.au;Database=IDPDEV;User Id=ARSUser;Password=hjytu73k48jk23!;TrustServerCertificate=True;");
@@ -626,35 +627,36 @@ public partial class AppDbContext : DbContext
             entity.Property(e => e.UpdatedDateTime).HasColumnType("datetime");
         });
 
-        modelBuilder.Entity<EntityModels.MailMessage>()
-            .HasIndex(x => new { x.Mailbox, x.InternetMessageId })
-            .IsUnique()
-            .HasFilter("[InternetMessageId] IS NOT NULL");
+        modelBuilder.Entity<MailMessage1>(entity =>
+        {
+            entity.HasKey(e => e.MailMessageId);
+            entity.ToTable("MailMessages");
+        });
 
-        // Fallback uniqueness on GraphMessageId
-        modelBuilder.Entity<EntityModels.MailMessage>()
-            .HasIndex(x => new { x.Mailbox, x.GraphMessageId })
-            .IsUnique();
+        modelBuilder.Entity<EntityModels.MailHeader>(entity =>
+        {
+            entity.HasKey(e => e.MailHeaderId);
+            entity.ToTable("MailHeaders");
+        });
 
-        // Headers: one per name
-        modelBuilder.Entity<MailHeader>()
-            .HasIndex(x => new { x.MailMessageId, x.Name })
-            .IsUnique();
+        modelBuilder.Entity<EntityModels.MailRecipient>(entity =>
+        {
+            entity.HasKey(e => e.MailRecipientId);
+            entity.ToTable("MailRecipients");
+        });
 
-        // Recipients: unique by type + email
-        modelBuilder.Entity<MailRecipient>()
-            .HasIndex(x => new { x.MailMessageId, x.Type, x.EmailAddress })
-            .IsUnique();
 
-        // Attachments: unique by GraphAttachmentId per message
-        modelBuilder.Entity<MailAttachment>()
-            .HasIndex(x => new { x.MailMessageId, x.GraphAttachmentId })
-            .IsUnique();
+        modelBuilder.Entity<EntityModels.MailAttachment>(entity =>
+        {
+            entity.HasKey(e => e.MailAttachmentId);
+            entity.ToTable("MailAttachments");
+        });
 
-        // SyncState unique per mailbox+folder+date
-        modelBuilder.Entity<MailSyncState>()
-            .HasIndex(x => new { x.Mailbox, x.FolderId, x.DateUtc })
-            .IsUnique();
+        modelBuilder.Entity<EntityModels.MailSyncState>(entity =>
+        {
+            entity.HasKey(e => e.MailSyncStateId);
+            entity.ToTable("MailSyncStates");
+        });
 
         modelBuilder.Entity<MailErrorOutput>(entity =>
         {
@@ -897,7 +899,7 @@ public partial class AppDbContext : DbContext
             entity.Property(e => e.Text).HasMaxLength(500);
         });
 
-        modelBuilder.Entity<Prompt>(entity =>
+        modelBuilder.Entity<Prompt1>(entity =>
         {
             entity.HasKey(e => e.PromptId);
             entity.ToTable("Prompts");

@@ -10,6 +10,6 @@ namespace AppCore.Interfaces
     public interface IEmailSerivce
     {
         Task<List<Message>> FetchInboxMessagesAsync(CancellationToken ct);
-        Task<int> ProcessInboxBatchForDateAsync(string mailbox, DateOnly date, int batchSize = 25, CancellationToken ct = default);
+        Task<int> ProcessInboxBatchForDateAsync(DateOnly date, int batchSize = 25, CancellationToken ct = default);
     }
 }

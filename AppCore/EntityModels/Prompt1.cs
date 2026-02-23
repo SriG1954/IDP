@@ -7,7 +7,7 @@ using System.Threading.Tasks;
 
 namespace AppCore.EntityModels
 {
-     public partial class Prompt
+     public partial class Prompt1
     {
         public int PromptId { get; set; }
         public string Name { get; set; } = default!;

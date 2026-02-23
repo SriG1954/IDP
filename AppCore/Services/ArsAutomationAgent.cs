@@ -6,7 +6,7 @@ namespace AppCore.Services
     public class ArsAutomationAgent : IArsAutomationAgent
     {
         private const string BaseUrl = "https://rlaars-uat.wlife.com.au:8078/ars/";
-        private const string DownloadFolder = @"C:\ARS\Downloads";
+        private const string DownloadFolder = @"C:\Temp\ARSDownloads";
 
         public async Task ExecuteAsync(List<string> documentIds)
         {

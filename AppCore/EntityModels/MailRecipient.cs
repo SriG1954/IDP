@@ -8,7 +8,6 @@ public partial class MailRecipient
 {
     [Key] public long MailRecipientId { get; set; }
     public long MailMessageId { get; set; }
-    public MailMessage MailMessage { get; set; } = default!;
 
     // "To" | "Cc" | "Bcc" (Bcc for received mails is usually not present)
     [Required, MaxLength(10)] public string Type { get; set; } = default!;

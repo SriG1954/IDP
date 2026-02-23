@@ -16,20 +16,19 @@ namespace AppCore.Services
         private readonly IIDPAuditLogRepository _audit;
         private readonly GraphServiceClient _graph;
         private readonly IConfiguration _cfg;
-        private string _sourceEmailAddress = string.Empty;
         private string _baseAttachmentFolder = @"C:\Temp\MailAttachments";
-
+        private MailboxConfig MailboxConfig = null!;
         public EmailService(AppDbContext db, IConfiguration cfg, IIDPAuditLogRepository audit)
         {
             _db = db;
             _cfg = cfg;
             _audit = audit;
 
-            var mailConfig = _db.MailboxConfigs.FirstOrDefault();
-            var tenantId = mailConfig!.TenantId!;
-            var clientId = mailConfig!.ClientId!;
-            var clientSecret = mailConfig!.ClientSecret!;
-            _sourceEmailAddress = mailConfig!.MailboxAddress!;
+            MailboxConfig = _db.MailboxConfigs.FirstOrDefault() ?? throw new ArgumentException("MailBox config is Null");
+            var tenantId = MailboxConfig!.TenantId!;
+            var clientId = MailboxConfig!.ClientId!;
+            var clientSecret = MailboxConfig!.ClientSecret!;
+            var mailboxAddress = MailboxConfig!.MailboxAddress!;
 
             var credential = new ClientSecretCredential(tenantId, clientId, clientSecret);
             _graph = new GraphServiceClient(credential);
@@ -39,7 +38,7 @@ namespace AppCore.Services
         {
             try
             {
-                var messages = await _graph.Users[_sourceEmailAddress].MailFolders["inbox"].Messages
+                var messages = await _graph.Users[MailboxConfig.MailboxAddress].MailFolders["inbox"].Messages
                        .GetAsync(requestConfig =>
                        {
                            requestConfig.QueryParameters.Orderby = new[] { "receivedDateTime asc" };
@@ -69,9 +68,10 @@ namespace AppCore.Services
             }
         }
 
-        public async Task<int> ProcessInboxBatchForDateAsync(string mailbox, DateOnly date, int batchSize = 25, CancellationToken ct = default)
+        public async Task<int> ProcessInboxBatchForDateAsync(DateOnly date, int batchSize = 25, CancellationToken ct = default)
         {
             const string folderId = "inbox";
+            string mailbox = MailboxConfig!.MailboxAddress!;
 
             // Load persisted nextLink (if any)
             var state = await _db.MailSyncStates
@@ -165,60 +165,70 @@ namespace AppCore.Services
             return processed;
         }
 
-        private async Task<EntityModels.MailMessage> UpsertMailMessageAsync(string mailbox, Microsoft.Graph.Models.Message m, CancellationToken ct)
+        private async Task<MailMessage1> UpsertMailMessageAsync(string mailbox, Microsoft.Graph.Models.Message m, CancellationToken ct)
         {
             // Try by InternetMessageId (stable) then GraphMessageId
-            EntityModels.MailMessage? entity = null;
+            MailMessage1? entity = null;
 
-            if (!string.IsNullOrEmpty(m.InternetMessageId))
+            try
             {
-                entity = await _db.MailMessages.FirstOrDefaultAsync(x =>
-                    x.Mailbox == mailbox && x.InternetMessageId == m.InternetMessageId, ct);
-            }
-
-            entity ??= await _db.MailMessages.FirstOrDefaultAsync(x =>
-                x.Mailbox == mailbox && x.GraphMessageId == m.Id, ct);
-
-            if (entity is null)
-            {
-                entity = new EntityModels.MailMessage
+                if (!string.IsNullOrEmpty(m.InternetMessageId))
                 {
-                    Mailbox = mailbox,
-                    GraphMessageId = m.Id!,
-                    InternetMessageId = m.InternetMessageId,
-                    Subject = m.Subject,
-                    FromAddress = m.From?.EmailAddress?.Address,
-                    SenderAddress = m.Sender?.EmailAddress?.Address,
-                    ReceivedDateTimeUtc = m.ReceivedDateTime?.UtcDateTime ?? DateTime.UtcNow,
-                    Importance = m.Importance?.ToString(),
-                    HasAttachments = m.HasAttachments ?? false,
-                    ConversationId = m.ConversationId,
-                    BodyPreview = m.BodyPreview
-                };
-                _db.MailMessages.Add(entity);
+                    entity = await _db.MailMessages.FirstOrDefaultAsync(x => x.Mailbox == mailbox && x.InternetMessageId == m.InternetMessageId, ct);
+                }
+
+                entity ??= await _db.MailMessages.FirstOrDefaultAsync(x => x.Mailbox == mailbox && x.GraphMessageId == m.Id, ct);
+
+                if (entity is null)
+                {
+                    entity = new MailMessage1
+                    {
+                        Mailbox = mailbox,
+                        GraphMessageId = m.Id!,
+                        InternetMessageId = m.InternetMessageId,
+                        Subject = m.Subject,
+                        FromAddress = m.From?.EmailAddress?.Address,
+                        SenderAddress = m.Sender?.EmailAddress?.Address,
+                        ReceivedDateTimeUtc = m.ReceivedDateTime?.UtcDateTime ?? DateTime.UtcNow,
+                        Importance = m.Importance?.ToString(),
+                        HasAttachments = m.HasAttachments ?? false,
+                        ConversationId = m.ConversationId,
+                        BodyPreview = m.BodyPreview,
+                        CreatedAtUtc = DateTime.UtcNow,
+                        UpdatedAtUtc = DateTime.UtcNow,
+                    };
+                    _db.MailMessages.Add(entity);
+                }
+                else
+                {
+                    entity.GraphMessageId = m.Id!;
+                    entity.InternetMessageId = m.InternetMessageId ?? entity.InternetMessageId;
+                    entity.Subject = m.Subject;
+                    entity.FromAddress = m.From?.EmailAddress?.Address;
+                    entity.SenderAddress = m.Sender?.EmailAddress?.Address;
+                    entity.ReceivedDateTimeUtc = m.ReceivedDateTime?.UtcDateTime ?? entity.ReceivedDateTimeUtc;
+                    entity.Importance = m.Importance?.ToString();
+                    entity.HasAttachments = m.HasAttachments ?? entity.HasAttachments;
+                    entity.ConversationId = m.ConversationId ?? entity.ConversationId;
+                    entity.BodyPreview = m.BodyPreview ?? entity.BodyPreview;
+                    entity.CreatedAtUtc = DateTime.UtcNow;
+                    entity.UpdatedAtUtc = DateTime.UtcNow;
+
+                    _db.MailMessages.Update(entity);
+                }
+
+                // Save now to get MailMessageId for FKs (keeps logic simple)
+                //await _db.SaveChangesAsync(ct);
             }
-            else
+            catch (Exception ex)
             {
-                entity.GraphMessageId = m.Id!;
-                entity.InternetMessageId = m.InternetMessageId ?? entity.InternetMessageId;
-                entity.Subject = m.Subject;
-                entity.FromAddress = m.From?.EmailAddress?.Address;
-                entity.SenderAddress = m.Sender?.EmailAddress?.Address;
-                entity.ReceivedDateTimeUtc = m.ReceivedDateTime?.UtcDateTime ?? entity.ReceivedDateTimeUtc;
-                entity.Importance = m.Importance?.ToString();
-                entity.HasAttachments = m.HasAttachments ?? entity.HasAttachments;
-                entity.ConversationId = m.ConversationId ?? entity.ConversationId;
-                entity.BodyPreview = m.BodyPreview ?? entity.BodyPreview;
-
-                _db.MailMessages.Update(entity);
+                await _audit.AddLogAsync(0, 0, ex.ToString(), AuditLogLevel.Error, AuditEventType.FetchEmailMessage);
+                throw;
             }
-
-            // Save now to get MailMessageId for FKs (keeps logic simple)
-            await _db.SaveChangesAsync(ct);
-            return entity;
+            return entity!;
         }
 
-        private async Task UpsertHeaderAsync(EntityModels.MailMessage msg, string name, string? value, CancellationToken ct)
+        private async Task UpsertHeaderAsync(EntityModels.MailMessage1 msg, string name, string? value, CancellationToken ct)
         {
             var existing = await _db.MailHeaders
                 .FirstOrDefaultAsync(x => x.MailMessageId == msg.MailMessageId && x.Name == name, ct);
@@ -231,15 +241,17 @@ namespace AppCore.Services
                     Name = name,
                     Value = value
                 });
+                await _db.SaveChangesAsync(ct);
             }
             else
             {
                 existing.Value = value;
                 _db.MailHeaders.Update(existing);
+                await _db.SaveChangesAsync(ct);
             }
         }
 
-        private async Task UpsertRecipientAsync(EntityModels.MailMessage msg, string type, Recipient r, CancellationToken ct)
+        private async Task UpsertRecipientAsync(EntityModels.MailMessage1 msg, string type, Recipient r, CancellationToken ct)
         {
             var email = r.EmailAddress?.Address ?? string.Empty;
             var display = r.EmailAddress?.Name;
@@ -256,19 +268,21 @@ namespace AppCore.Services
                     DisplayName = display,
                     EmailAddress = email
                 });
+                await _db.SaveChangesAsync(ct);
             }
             else
             {
                 existing.DisplayName = display;
                 _db.MailRecipients.Update(existing);
+                await _db.SaveChangesAsync(ct);
             }
         }
 
-        private async Task ProcessAttachmentsAsync(string mailbox, Microsoft.Graph.Models.Message m, EntityModels.MailMessage msg, DateOnly date, CancellationToken ct)
+        private async Task ProcessAttachmentsAsync(string mailbox, Microsoft.Graph.Models.Message m, EntityModels.MailMessage1 msg, DateOnly date, CancellationToken ct)
         {
             var atts = await _graph.Users[mailbox].Messages[m.Id].Attachments.GetAsync(rc =>
             {
-                rc.QueryParameters.Select = new[] { "id", "name", "size", "contentType", "isInline", "@odata.type" };
+                rc.QueryParameters.Select = new[] { "id", "name", "size", "contentType", "isInline" };
             }, ct);
 
             if (atts?.Value == null) return;
@@ -297,10 +311,12 @@ namespace AppCore.Services
                     SizeBytes = size,
                     IsInline = fa.IsInline ?? false,
                     SavedPath = savedPath,
-                    Sha256Hex = sha256Hex
+                    Sha256Hex = sha256Hex,
+                    CreatedAtUtc = DateTime.UtcNow,
                 };
 
                 _db.MailAttachments.Add(row);
+                await _db.SaveChangesAsync(ct);
             }
         }
 
@@ -321,15 +337,19 @@ namespace AppCore.Services
                     UpdatedAtUtc = DateTime.UtcNow
                 };
                 _db.MailSyncStates.Add(state);
+                await _db.SaveChangesAsync(ct);
+
             }
             else
             {
                 state.OdataNextLink = nextLink;
                 state.UpdatedAtUtc = DateTime.UtcNow;
                 _db.MailSyncStates.Update(state);
+                await _db.SaveChangesAsync(ct);
+
             }
 
-            await _db.SaveChangesAsync(ct);
+            //await _db.SaveChangesAsync(ct);
         }
 
         private async Task<Stream> DownloadAttachmentStreamAsync(string mailbox, string messageId, string attachmentId, CancellationToken ct)
