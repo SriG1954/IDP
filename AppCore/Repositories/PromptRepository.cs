@@ -13,7 +13,11 @@ namespace AppCore.Repositories
         private readonly AppDbContext _context;
         private readonly IMemoryCache _cache;
 
-        public PromptRepository(AppDbContext context, IMemoryCache cache) { _context = context; _cache = cache; }
+        public PromptRepository(AppDbContext context, IMemoryCache cache) 
+        { 
+            _context = context; 
+            _cache = cache; 
+        }
 
         public async Task<PaginatedList<Prompt1>> SearchAsync(string column, string search, int pageIndex = 1, int pageSize = 25)
         {

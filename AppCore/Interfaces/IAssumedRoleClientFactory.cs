@@ -1,4 +1,5 @@
 ﻿using Amazon.S3;
+using Amazon.SageMakerRuntime;
 using Amazon.Textract;
 using System;
 using System.Collections.Generic;
@@ -13,7 +14,8 @@ namespace AppCore.Interfaces
 
     public interface IAssumedRoleClientFactory
     {
-        Task<S3ClientDescriptor> CreateS3ClientAsync(CancellationToken ct = default);
-        Task<TextractClientDescriptor> CreateTextractClientAsync(CancellationToken ct = default);
+        Task<IAmazonTextract> GetTextractClientAsync(CancellationToken ct = default);
+        Task<AmazonSageMakerRuntimeClient> GetAmazonSageMakerRuntimeClientAsync(CancellationToken ct = default);
+        Task<IAmazonS3> GetS3ClientAsync(CancellationToken ct = default);
     }
 }

@@ -1,12 +1,15 @@
 ﻿using Amazon;
 using Amazon.Runtime;
+using Amazon.Runtime.CredentialManagement;
 using Amazon.S3;
+using Amazon.SageMakerRuntime;
 using Amazon.SecurityToken;
 using Amazon.SecurityToken.Model;
 using Amazon.Textract;
 using AppCore.Interfaces;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
+using Microsoft.JSInterop;
 
 namespace AppCore.Services
 {
@@ -16,8 +19,9 @@ namespace AppCore.Services
         private readonly ILogger<AssumedRoleClientFactory> _logger;
         private readonly IIDPAuditLogRepository _audit;
         private readonly SemaphoreSlim _assumeLock = new(1, 1);
-        private S3ClientDescriptor? _s3cached;
-        private TextractClientDescriptor? _textractCached;
+        private IAmazonS3? amazonS3 = null;
+        private IAmazonTextract? amazonTextract = null;
+        private IAmazonSageMakerRuntime? amazonSageMakerRuntime = null;
         private static readonly TimeSpan RefreshBuffer = TimeSpan.FromMinutes(2);
 
         public AssumedRoleClientFactory(IConfiguration cfg, ILogger<AssumedRoleClientFactory> logger, IIDPAuditLogRepository audit)
@@ -27,148 +31,128 @@ namespace AppCore.Services
             _audit = audit;
         }
 
-        public async Task<S3ClientDescriptor> CreateS3ClientAsync(CancellationToken ct = default)
+        public async Task<IAmazonTextract> GetTextractClientAsync(CancellationToken ct = default)
         {
-            var environment = _cfg["AWS:Environment"];
-            if (environment == null)
-                throw new ArgumentNullException(nameof(environment));
+            string ProfileName = _cfg["AWSDTS:ProfileName"] ?? throw new InvalidOperationException("AWS:ProfileName is required");
 
-            if (_s3cached is not null && DateTime.UtcNow < _s3cached.ExpiryUtc - RefreshBuffer)
-                return _s3cached;
-
-            await _assumeLock.WaitAsync(ct);
             try
             {
-                if (_s3cached is not null && DateTime.UtcNow < _s3cached.ExpiryUtc - RefreshBuffer)
-                    return _s3cached;
+                var chain = new CredentialProfileStoreChain();
 
-                await SafeAuditAsync("AssumeRole: starting", AuditLogLevel.Info);
+                if (!chain.TryGetAWSCredentials(ProfileName, out var credentials))
+                    throw new InvalidOperationException($"AWS profile '{ProfileName}' not found.");
 
-                var region = RegionEndpoint.APSoutheast2;
-                var stsConfig = new AmazonSecurityTokenServiceConfig { RegionEndpoint = region };
+                amazonTextract = new AmazonTextractClient(
+                    credentials,
+                    RegionEndpoint.APSoutheast2);
 
-                var proxyHost = _cfg["AWS:ProxyHost"];
-                if (!string.IsNullOrEmpty(proxyHost) && int.TryParse(_cfg["AWS:ProxyPort"], out var p))
+                if (amazonTextract == null)
                 {
-                    stsConfig.ProxyHost = proxyHost;
-                    stsConfig.ProxyPort = p;
+                    throw new InvalidOperationException("Unable to create Textract client.");
                 }
 
-                using var sts = new AmazonSecurityTokenServiceClient(new InstanceProfileAWSCredentials(), stsConfig);
+                return (IAmazonTextract)amazonTextract;
 
-                var assumeReq = new AssumeRoleRequest
-                {
-                    RoleArn = _cfg["AWS:RoleArn"],
-                    RoleSessionName = _cfg["AWS:RoleSessionName"] ?? "AppSession",
-                    DurationSeconds = int.TryParse(_cfg["AWS:RoleDurationSeconds"], out var d) ? d : 3600
-                };
-
-                var resp = await sts.AssumeRoleAsync(assumeReq, ct);
-
-                await SafeAuditAsync("Received AssumeRoleResponse resp", AuditLogLevel.Info);
-
-                var creds = new SessionAWSCredentials(resp.Credentials.AccessKeyId, resp.Credentials.SecretAccessKey, resp.Credentials.SessionToken);
-
-                var s3Config = new AmazonS3Config
-                {
-                    RegionEndpoint = region,
-                    ThrottleRetries = true,
-                    RetryMode = RequestRetryMode.Adaptive
-                };
-
-                await SafeAuditAsync("Creating AmazonS3Client", AuditLogLevel.Info);
-
-                var s3 = new AmazonS3Client(creds, s3Config);
-                var expiry = DateTime.SpecifyKind(resp.Credentials.Expiration!.Value, DateTimeKind.Utc);
-
-                _s3cached = new S3ClientDescriptor(s3, expiry);
-
-                await SafeAuditAsync($"AssumeRole: success; expires {expiry:u}", AuditLogLevel.Info);
-
-                return _s3cached;
             }
-            catch (Exception ex)
+            catch (OperationCanceledException)
             {
-                await SafeAuditAsync($"AssumeRole: failed {ex.Message}", AuditLogLevel.Error);
+                await SafeAuditAsync("GetTextractClientAsync cancelled", AuditLogLevel.Error);
                 throw;
             }
-            finally
+            catch (InvalidOperationException)
             {
-                _assumeLock.Release();
+                await SafeAuditAsync("GetTextractClientAsync error", AuditLogLevel.Error);
+                throw;
+            }
+
+            catch (Exception ex)
+            {
+                await SafeAuditAsync($"GetTextractClientAsync Exception error: {ex.Message}", AuditLogLevel.Error);
+                throw;
             }
         }
 
-
-        public async Task<TextractClientDescriptor> CreateTextractClientAsync(CancellationToken ct = default)
+        public async Task<AmazonSageMakerRuntimeClient> GetAmazonSageMakerRuntimeClientAsync(CancellationToken ct = default)
         {
-            var environment = _cfg["AWS:Environment"];
-            if (environment == null)
-                throw new ArgumentNullException(nameof(environment));
+            string ProfileName = _cfg["AWSDTS:ProfileName"] ?? throw new InvalidOperationException("AWS:ProfileName is required");
 
-            // Fast-path: return cached instance if still valid
-            if (_textractCached is not null && DateTime.UtcNow < _textractCached.ExpiryUtc - RefreshBuffer)
-                return _textractCached;
-
-            await _assumeLock.WaitAsync(ct);
             try
             {
-                if (_textractCached is not null && DateTime.UtcNow < _textractCached.ExpiryUtc - RefreshBuffer)
-                    return _textractCached;
+                var chain = new CredentialProfileStoreChain();
 
-                await SafeAuditAsync("AssumeRole (Textract): starting", AuditLogLevel.Info);
+                if (!chain.TryGetAWSCredentials(ProfileName, out var credentials))
+                    throw new InvalidOperationException($"AWS profile '{ProfileName}' not found.");
 
-                var region = RegionEndpoint.APSoutheast2;
-                var stsConfig = new AmazonSecurityTokenServiceConfig { RegionEndpoint = region };
+                amazonSageMakerRuntime = new AmazonSageMakerRuntimeClient(
+                    credentials,
+                    RegionEndpoint.APSoutheast2);
 
-                var proxyHost = _cfg["AWS:ProxyHost"];
-                if (!string.IsNullOrEmpty(proxyHost) && int.TryParse(_cfg["AWS:ProxyPort"], out var p))
+                if (amazonSageMakerRuntime == null)
                 {
-                    stsConfig.ProxyHost = proxyHost;
-                    stsConfig.ProxyPort = p;
+                    throw new InvalidOperationException("Unable to create AmazonSageMakerRuntimeClient.");
                 }
 
-                using var sts = new AmazonSecurityTokenServiceClient(new InstanceProfileAWSCredentials(), stsConfig);
-
-                var assumeReq = new AssumeRoleRequest
-                {
-                    RoleArn = _cfg["AWS:RoleArn"],
-                    RoleSessionName = _cfg["AWS:RoleSessionName"] ?? "AppSession",
-                    DurationSeconds = int.TryParse(_cfg["AWS:RoleDurationSeconds"], out var d) ? d : 3600
-                };
-
-                var resp = await sts.AssumeRoleAsync(assumeReq, ct);
-
-                await SafeAuditAsync("Received AssumeRoleResponse resp", AuditLogLevel.Info);
-
-                var creds = new SessionAWSCredentials(resp.Credentials.AccessKeyId, resp.Credentials.SecretAccessKey, resp.Credentials.SessionToken);
-
-                var textractConfig = new AmazonTextractConfig
-                {
-                    RegionEndpoint = region,
-                    ThrottleRetries = true,
-                    RetryMode = RequestRetryMode.Adaptive
-                };
-
-                await SafeAuditAsync("Creating AmazonTextractClient", AuditLogLevel.Info);
-
-                var textract = new AmazonTextractClient(creds, textractConfig);
-                var expiry = DateTime.SpecifyKind(resp.Credentials.Expiration!.Value, DateTimeKind.Utc);
-
-                _textractCached = new TextractClientDescriptor(textract, expiry);
-
-                await SafeAuditAsync($"AssumeRole (Textract): success; expires {expiry:u}", AuditLogLevel.Info);
-
-                return _textractCached;
+                return (AmazonSageMakerRuntimeClient)amazonSageMakerRuntime;
             }
-            catch (Exception ex)
+
+            catch (OperationCanceledException)
             {
-                await SafeAuditAsync($"AssumeRole (Textract): failed {ex.Message}", AuditLogLevel.Error);
+                await SafeAuditAsync("GetAmazonSageMakerRuntimeClientAsync cancelled", AuditLogLevel.Error);
                 throw;
             }
-            finally
+            catch (InvalidOperationException)
             {
-                _assumeLock.Release();
+                await SafeAuditAsync("GetAmazonSageMakerRuntimeClientAsync error", AuditLogLevel.Error);
+                throw;
             }
+
+            catch (Exception ex)
+            {
+                await SafeAuditAsync($"GetAmazonSageMakerRuntimeClientAsync Exception error: {ex.Message}", AuditLogLevel.Error);
+                throw;
+            }
+        }
+
+        public async Task<IAmazonS3> GetS3ClientAsync(CancellationToken ct = default)
+        {
+            string ProfileName = _cfg["AWSDTS:ProfileName"] ?? throw new InvalidOperationException("AWS:ProfileName is required");
+
+            try
+            {
+                var chain = new CredentialProfileStoreChain();
+
+                if (!chain.TryGetAWSCredentials(ProfileName, out var credentials))
+                    throw new InvalidOperationException($"AWS profile '{ProfileName}' not found.");
+
+                amazonS3 = new AmazonS3Client(
+                    credentials,
+                    RegionEndpoint.APSoutheast2);
+
+                if (amazonS3 == null)
+                {
+                    throw new InvalidOperationException("Unable to create AmazonS3Client.");
+                }
+
+                return (IAmazonS3)amazonS3;
+            }
+
+            catch (OperationCanceledException)
+            {
+                await SafeAuditAsync("GetS3ClientAsync cancelled", AuditLogLevel.Error);
+                throw;
+            }
+            catch (InvalidOperationException)
+            {
+                await SafeAuditAsync("GetS3ClientAsync InvalidOperationException error", AuditLogLevel.Error);
+                throw;
+            }
+
+            catch (Exception ex)
+            {
+                await SafeAuditAsync($"GetS3ClientAsync Exception error: {ex.Message}", AuditLogLevel.Error);
+                throw;
+            }
+
         }
 
         private async Task SafeAuditAsync(string message, AuditLogLevel level)
@@ -185,7 +169,6 @@ namespace AppCore.Services
 
         public void Dispose()
         {
-            _s3cached?.Client?.Dispose();
             _assumeLock?.Dispose();
         }
     }

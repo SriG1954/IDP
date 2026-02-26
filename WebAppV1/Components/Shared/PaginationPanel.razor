@@ -1,0 +1,43 @@
+﻿@* Shared/PaginationPanel.razor *@
+<div class="pagination-controls mt-3">
+    <ul class="pagination justify-content-center custom-pagination">
+        <li class="page-item @(IsFirstPage ? "disabled" : "")">
+            <button class="page-link" @onclick="() => Change(1)" disabled="@IsFirstPage">« First</button>
+        </li>
+        <li class="page-item @(IsFirstPage ? "disabled" : "")">
+            <button class="page-link" @onclick="() => Change(PageIndex - 1)" disabled="@IsFirstPage">‹ Prev</button>
+        </li>
+        <li class="page-item disabled">
+            <span class="page-link">
+                Page @PageIndex of @TotalPages
+            </span>
+        </li>
+        <li class="page-item @(IsLastPage ? "disabled" : "")">
+            <button class="page-link" @onclick="() => Change(PageIndex + 1)" disabled="@IsLastPage">Next ›</button>
+        </li>
+        <li class="page-item @(IsLastPage ? "disabled" : "")">
+            <button class="page-link" @onclick="() => Change(TotalPages)" disabled="@IsLastPage">Last »</button>
+        </li>
+    </ul>
+</div>
+
+@code {
+    [Parameter] public int PageIndex { get; set; } = 1;
+    [Parameter] public int TotalPages { get; set; } = 1;
+
+    // Parent provides handler to load the requested page number
+    [Parameter] public EventCallback<int> OnPageChanged { get; set; }
+
+    private bool IsFirstPage => PageIndex <= 1;
+    private bool IsLastPage => PageIndex >= Math.Max(1, TotalPages);
+
+    private async Task Change(int newPage)
+    {
+        if (newPage < 1) newPage = 1;
+        if (newPage > TotalPages) newPage = TotalPages;
+
+        if (newPage == PageIndex) return;
+
+        await OnPageChanged.InvokeAsync(newPage);
+    }
+}

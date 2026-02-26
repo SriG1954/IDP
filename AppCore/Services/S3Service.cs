@@ -10,7 +10,7 @@ using System.Xml.Linq;
 
 namespace AppCore.Services
 {
-    public class S3Service
+    public class S3Service :IS3Service
     {
         private readonly IConfiguration _cfg;
         private readonly IIDPAuditLogRepository _log;
@@ -20,7 +20,6 @@ namespace AppCore.Services
         private string tempKey = string.Empty;
         private string environment = string.Empty;
         private IAmazonS3? _s3Client;
-        private DateTime _expiryUtc;
         private static readonly TimeSpan RefreshBuffer = TimeSpan.FromMinutes(2);
 
         public S3Service(IConfiguration cfg, IIDPAuditLogRepository log, ILogger<S3Service> logger, IAssumedRoleClientFactory factory)
@@ -36,51 +35,17 @@ namespace AppCore.Services
         {
             try
             {
-                try
-                {
-                    if (environment == null)
-                        throw new ArgumentNullException(nameof(environment));
-
-                    if (environment == "DEV" || Environment.MachineName == "RL-L-DU7N2UL2NT")
-                    {
-                        _s3Client = new AmazonS3Client(RegionEndpoint.APSoutheast2);
-                        return _s3Client;
-                    }
-                }
-                catch (Exception ex)
-                {
-                    await _log.AddLogAsync(0, 0, $"GetClientAsync error: {ex.Message}", AuditLogLevel.Error, AuditEventType.AWSContext);
-                    throw;
-                }
-
-                if (_s3Client is not null && DateTime.UtcNow < _expiryUtc - RefreshBuffer)
-                    return _s3Client;
-
-                await _refreshLock.WaitAsync(ct);
-                try
-                {
-                    if (_s3Client is not null && DateTime.UtcNow < _expiryUtc - RefreshBuffer)
-                        return _s3Client;
-
-                    var desc = await _factory.CreateS3ClientAsync(ct);
-                    _s3Client = desc.Client;
-                    _expiryUtc = desc.ExpiryUtc;
-                    _logger.LogInformation("S3 client refreshed; expires {ExpiryUtc}", _expiryUtc);
-                    return _s3Client;
-                }
-                finally
-                {
-                    _refreshLock.Release();
-                }
+                _s3Client = await _factory.GetS3ClientAsync(ct);
+                return _s3Client;
             }
             catch (OperationCanceledException ex)
             {
-                await _log.AddLogAsync(0, 0, $"Operation cancelled: {ex.Message}", AuditLogLevel.Error, AuditEventType.AWSContext);
+                await _log.AddLogAsync(0, 0, $"GetClientAsync Operation cancelled: {ex.Message}", AuditLogLevel.Error, AuditEventType.AWSContext);
                 throw;
             }
             catch (Exception ex)
             {
-                await _log.AddLogAsync(0, 0, $"Error GetClientAsync: {ex.Message}", AuditLogLevel.Error, AuditEventType.AWSContext);
+                await _log.AddLogAsync(0, 0, $"GetClientAsync Error GetClientAsync: {ex.Message}", AuditLogLevel.Error, AuditEventType.AWSContext);
                 throw new Exception($"Error GetClientAsync: {ex.Message}");
             }
         }

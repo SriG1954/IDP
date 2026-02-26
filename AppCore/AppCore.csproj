@@ -9,6 +9,7 @@
 	<ItemGroup>
 		<PackageReference Include="Aspose.PDF" Version="26.2.0" />
 		<PackageReference Include="AWSSDK.BedrockRuntime" Version="4.0.4.1" />
+		<PackageReference Include="AWSSDK.Extensions.NETCore.Setup" Version="4.0.3.23" />
 		<PackageReference Include="AWSSDK.S3" Version="4.0.6.8" />
 		<PackageReference Include="AWSSDK.S3Vectors" Version="4.0.1.3" />
 		<PackageReference Include="AWSSDK.SageMakerRuntime" Version="4.0.2" />

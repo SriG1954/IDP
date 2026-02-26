@@ -1,0 +1,45 @@
+﻿@page "/prompts/create"
+@using AppCore.EntityModels
+@using AppCore.Interfaces
+@inject IPromptRepository _repo
+@inject NavigationManager Nav
+@rendermode InteractiveServer
+
+<h4>Create New Prompt</h4>
+
+<EditForm Model="model" OnValidSubmit="HandleSubmit">
+    <DataAnnotationsValidator />
+    <ValidationSummary />
+
+    <div class="mb-3">
+        <label>Name</label>
+        <InputText class="form-control" @bind-Value="model.Name" />
+    </div>
+    <div class="mb-3">
+        <label>Content</label>
+        <InputTextArea class="form-control" @bind-Value="model.Content" rows="10" />
+    </div>
+    <div class="mb-3">
+        <label>Version</label>
+        <InputNumber class="form-control" @bind-Value="model.Version" />
+    </div>
+    <div class="form-check mb-3">
+        <InputCheckbox class="form-check-input" @bind-Value="model.IsActive" />
+        <label class="form-check-label">Active</label>
+    </div>
+
+    <button class="btn btn-primary" type="submit">Create</button>
+    <button class="btn btn-secondary" type="button" @onclick="Cancel">Cancel</button>
+</EditForm>
+
+@code {
+    private Prompt1 model = new();
+
+    private async Task HandleSubmit()
+    {
+        await _repo.AddAsync(model);
+        Nav.NavigateTo("/prompts");
+    }
+
+    private void Cancel() => Nav.NavigateTo("/prompts");
+}

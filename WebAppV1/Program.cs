@@ -1,3 +1,4 @@
+using Amazon.SageMakerRuntime;
 using AppCore.Data;
 using AppCore.Helper;
 using AppCore.Interfaces;
@@ -7,6 +8,7 @@ using Microsoft.AspNetCore.Authentication.Negotiate;
 using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Primitives;
 using WebAppV1.Components;
 using WebAppV1.Components.Account;
 using WebAppV1.Data;
@@ -62,6 +64,22 @@ builder.Services.AddScoped<IMailMessageRepository, MailMessageRepository>();
 // Email Service
 builder.Services.AddScoped<IEmailSerivce, EmailService>();
 
+// S3 Service
+builder.Services.AddScoped<IAssumedRoleClientFactory, AssumedRoleClientFactory>();
+builder.Services.AddScoped<IS3Service, S3Service>();
+
+// Textract Service
+builder.Services.AddScoped<ITextractService, TextractService>();
+
+// LLM service
+builder.Services.AddScoped<IVLMService, VLMService>();
+
+// ARS
+builder.Services.AddScoped<IArsAutomationAgent, ArsAutomationAgent>();
+
+// prompts
+builder.Services.AddMemoryCache();
+builder.Services.AddScoped<IPromptRepository, PromptRepository>();
 
 builder.Services.AddAuthentication(NegotiateDefaults.AuthenticationScheme)
     .AddNegotiate();

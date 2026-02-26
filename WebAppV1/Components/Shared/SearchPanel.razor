@@ -1,0 +1,57 @@
+﻿@* Shared/SearchPanel.razor *@
+<div class="card shadow-sm border-0 mb-3">
+    <div class="card-body py-2">
+        <div class="d-flex flex-wrap align-items-center gap-2">
+            <label class="form-label fw-semibold mb-0 me-2 text-secondary">
+                <i class="fa fa-search me-1 text-primary"></i> Search
+            </label>
+
+            <select @bind="SelectedColumn"
+                    class="form-select form-select-sm w-auto border-primary-subtle shadow-sm">
+                @if (Columns != null && Columns.Any())
+                {
+                    @foreach (var col in Columns)
+                    {
+                        <option value="@col">@col</option>
+                    }
+                }
+            </select>
+
+            <input type="text"
+                   @bind="SearchText"
+                   placeholder="Enter text..."
+                   class="form-control form-control-sm border-primary-subtle shadow-sm w-auto flex-grow-1" />
+
+            <button class="btn btn-primary btn-sm px-3 shadow-sm" @onclick="OnSearchClicked">
+                <i class="fa fa-search me-1"></i> Search
+            </button>
+
+            <button class="btn btn-outline-secondary btn-sm px-3 shadow-sm" @onclick="OnClearClicked">
+                <i class="fa fa-times me-1"></i> Clear
+            </button>
+        </div>
+    </div>
+</div>
+
+@code {
+    [Parameter] public IEnumerable<string>? Columns { get; set; }
+    [Parameter] public string SelectedColumn { get; set; } = string.Empty;
+    [Parameter] public string SearchText { get; set; } = string.Empty;
+
+    // Event callback fired when user clicks Search
+    [Parameter] public EventCallback<(string Column, string Text)> SearchRequested { get; set; }
+
+    // Event callback for Clear
+    [Parameter] public EventCallback ClearRequested { get; set; }
+
+    private async Task OnSearchClicked()
+    {
+        await SearchRequested.InvokeAsync((SelectedColumn, SearchText));
+    }
+
+    private async Task OnClearClicked()
+    {
+        SearchText = string.Empty;
+        await ClearRequested.InvokeAsync();
+    }
+}

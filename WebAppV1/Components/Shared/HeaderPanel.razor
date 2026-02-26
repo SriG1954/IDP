@@ -1,0 +1,36 @@
+﻿<div class="d-flex justify-content-between align-items-center flex-wrap bg-light p-3 rounded shadow-sm mb-3">
+    <div>
+        <h4 class="fw-bold text-primary mb-0">
+            <i class="@Icon me-2"></i>@Title
+        </h4>
+        @if (!string.IsNullOrEmpty(SubTitle))
+        {
+            <small class="text-muted">@SubTitle</small>
+        }
+    </div>
+
+    <div class="d-flex justify-content-end gap-2">
+        @if (ChildContent1 != null)
+        {
+            <div>@ChildContent1</div>
+        }
+        @if (ChildContent2 != null)
+        {
+            <div>@ChildContent2</div>
+        }
+        @if (ChildContent != null)
+        {
+            <div>@ChildContent</div>
+        }
+    </div>
+</div>
+
+@code {
+    [Parameter] public string Title { get; set; } = string.Empty;
+    [Parameter] public string? SubTitle { get; set; }
+    [Parameter] public string Icon { get; set; } = "fa fa-list";
+    [Parameter] public RenderFragment? ChildContent1 { get; set; }
+    [Parameter] public RenderFragment? ChildContent2 { get; set; }
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+
+}

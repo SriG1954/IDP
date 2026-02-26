@@ -1,0 +1,90 @@
+﻿@page "/prompts"
+@using AppCore.EntityModels
+@using AppCore.Helper
+@using AppCore.Interfaces
+@inject IPromptRepository _repo
+@inject IJSRuntime JS
+@inject NavigationManager Nav
+@rendermode InteractiveServer
+
+<h3>Prompts</h3>
+<button class="btn btn-primary" @onclick="AddNew">Add New</button>
+
+@if (IsLoading)
+{
+    <p>Loading data...</p>
+}
+else if (items?.Any() != true)
+{
+    <p>No records found</p>
+}
+else
+{
+    <table class="table table-striped">
+        <thead>
+            <tr>
+                <th>Id</th>
+                <th>Name</th>
+                <th>Version</th>
+                <th>Active</th>
+                <th>Updated (UTC)</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var p in items)
+            {
+                <tr>
+                    <td>@p.PromptId</td>
+                    <td>@p.Name</td>
+                    <td>@p.Version</td>
+                    <td>@p.IsActive</td>
+                    <td>@p.UpdatedAtUtc</td>
+                    <td>
+                        <a href="javascript:void(0)" @onclick="() => Edit(p.PromptId)">Edit</a>
+                        &nbsp;|&nbsp;
+                        <a href="javascript:void(0)" @onclick="() => Delete(p.PromptId)">Delete</a>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+@code {
+    private PaginatedList<Prompt1> items = default!;
+    private bool IsLoading;
+
+    protected override async Task OnInitializedAsync() => await LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        IsLoading = true;
+        try
+        {
+            items = await _repo.SearchAsync("Name", string.Empty, 1, 25);
+        }
+        catch (Exception ex)
+        {
+            await JS.InvokeVoidAsync("showAlert", $"Error while loading: {ex.Message}");
+        }
+        finally
+        {
+            IsLoading = false;
+            StateHasChanged();
+        }
+    }
+
+    private void AddNew() => Nav.NavigateTo("/prompts/create");
+    private void Edit(int id) => Nav.NavigateTo($"/prompts/edit/{id}");
+
+    private async Task Delete(int id)
+    {
+        var entity = await _repo.GetAsync(id);
+        if (entity is not null)
+        {
+            await _repo.DeleteAsync(entity);
+            await LoadAsync();
+        }
+    }
+}

@@ -18,7 +18,7 @@ namespace AppCore.Services
         private readonly IS3Service _s3;
         private readonly IPdfToImagesService _pdf;
         private readonly ITextractService _tex;
-        private readonly IVlmService _vlm;
+        private readonly IVLMService _vlm;
         private readonly IPromptRepository _cfg;
         private readonly AppDbContext _db;
         private readonly ILogger<ClassifierService> _log;
@@ -26,7 +26,7 @@ namespace AppCore.Services
         private const int MAX_IMAGE_KB_FOR_PROCESSING = 450;
 
         public ClassifierService(IS3Service s3, IPdfToImagesService pdf, ITextractService tex,
-                                 IVlmService vlm, IPromptRepository cfg, AppDbContext db,
+                                 IVLMService vlm, IPromptRepository cfg, AppDbContext db,
                                  ILogger<ClassifierService> log)
         { _s3 = s3; _pdf = pdf; _tex = tex; _vlm = vlm; _cfg = cfg; _db = db; _log = log; }
 
@@ -117,7 +117,9 @@ namespace AppCore.Services
                                   JsonSerializer.Serialize(classifierInput, new JsonSerializerOptions { WriteIndented = true });
 
                 var (endpoint2, _, maxTokens2, temp2) = await _cfg.GetActiveEndpointAsync("Qwen2-VL", ct);
-                var rawClassifier = await _vlm.CallClassifierAsync(endpoint2, finalPrompt, firstImage, 4000, temp2, ct);
+
+                // correct the missing params
+                var rawClassifier = await _vlm.CallClassifierAsync(endpoint2, finalPrompt, "", "", firstImage, 4000, temp2, ct);
 
                 var classification = TryParseJson(rawClassifier) ?? new Dictionary<string, object>
                 {

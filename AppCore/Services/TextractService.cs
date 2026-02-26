@@ -1,4 +1,7 @@
 ﻿using Amazon;
+using Amazon.Runtime;
+using Amazon.Runtime.CredentialManagement;
+using Amazon.S3;
 using Amazon.Textract;
 using Amazon.Textract.Model;
 using AppCore.EntityModels;
@@ -10,22 +13,19 @@ using System.Text;
 
 namespace AppCore.Services
 {
-    public class TextractService
+    public class TextractService : ITextractService
     {
         private readonly IConfiguration _cfg;
         private readonly IIDPAuditLogRepository _audit;
         private readonly ILogger<TextractService> _logger;
         private readonly IAssumedRoleClientFactory _factory;
         private readonly IS3Service _s3Service;
-
         private readonly SemaphoreSlim _refreshLock = new(1, 1);
-        private IAmazonTextract? _textractClient;
-        private DateTime _expiryUtc;
+        //private IAmazonTextract? _textractClient;
 
         private readonly string _environment;
         private static readonly TimeSpan RefreshBuffer = TimeSpan.FromMinutes(2);
 
-        // Async-supported file types for StartDocumentTextDetection.
         private static readonly HashSet<string> AllowedExtensions = new(StringComparer.OrdinalIgnoreCase)
         { ".pdf", ".tiff", ".tif", ".jpg", ".jpeg", ".png" };
 
@@ -42,82 +42,53 @@ namespace AppCore.Services
             _factory = factory;
             _s3Service = s3Service;
 
-            _environment = _cfg["AWS:Environment"] ?? "DEV";
+            _environment = _cfg["AWSDTS:Environment"]!;
         }
 
         /// <summary>
         /// Returns a cached IAmazonTextract assumed-role client, refreshed before STS expiry.
         /// Uses local default chain if AWS:BypassAssumeRoleInDev is true.
         /// </summary>
-        public async Task<IAmazonTextract> GetClientAsync(CancellationToken ct = default)
-        {
-            try
-            {
-                // Optional dev bypass (use local profile/role etc.)
-                var bypassDev = bool.TryParse(_cfg["AWS:BypassAssumeRoleInDev"], out var b) && b;
-                if (bypassDev && string.Equals(_environment, "DEV", StringComparison.OrdinalIgnoreCase))
-                {
-                    _textractClient ??= new AmazonTextractClient(ResolveRegion());
-                    return _textractClient;
-                }
-
-                if (_textractClient is not null && DateTime.UtcNow < _expiryUtc - RefreshBuffer)
-                    return _textractClient;
-
-                await _refreshLock.WaitAsync(ct).ConfigureAwait(false);
-                try
-                {
-                    if (_textractClient is not null && DateTime.UtcNow < _expiryUtc - RefreshBuffer)
-                        return _textractClient;
-
-                    var desc = await _factory.CreateTextractClientAsync(ct).ConfigureAwait(false);
-                    _textractClient = desc.Client;
-                    _expiryUtc = desc.ExpiryUtc;
-
-                    _logger.LogInformation("Textract client refreshed; expires {ExpiryUtc:u}", _expiryUtc);
-                    return _textractClient!;
-                }
-                finally
-                {
-                    _refreshLock.Release();
-                }
-            }
-            catch (OperationCanceledException)
-            {
-                await SafeAuditAsync("GetClientAsync cancelled", AuditLogLevel.Error, AuditEventType.AWSContext);
-                throw;
-            }
-            catch (Exception ex)
-            {
-                await SafeAuditAsync($"GetClientAsync error: {ex.Message}", AuditLogLevel.Error, AuditEventType.AWSContext);
-                throw;
-            }
-        }
 
         public async Task<Dictionary<string, object>> DetectLinesAsync(string imagePath, CancellationToken ct)
         {
-            var bytes = await File.ReadAllBytesAsync(imagePath, ct);
-            _textractClient = await GetClientAsync(ct);
-            var resp = await _textractClient.DetectDocumentTextAsync(new DetectDocumentTextRequest
-            {
-                Document = new Document { Bytes = new MemoryStream(bytes) }
-            }, ct);
-
             var filtered = new List<object>();
-            foreach (var b in resp.Blocks)
+
+            try
             {
-                if (b.BlockType == BlockType.LINE)
+                var bytes = await File.ReadAllBytesAsync(imagePath, ct);
+
+                var _textractClient = await _factory.GetTextractClientAsync(ct).ConfigureAwait(false);
+
+                DetectDocumentTextRequest docRequest = new DetectDocumentTextRequest
                 {
-                    filtered.Add(new
+                    Document = new Document { Bytes = new MemoryStream(bytes) }
+                };
+
+                var resp = await _textractClient.DetectDocumentTextAsync(docRequest, ct);
+
+                foreach (var b in resp.Blocks)
+                {
+                    if (b.BlockType == BlockType.LINE)
                     {
-                        BlockType = b.BlockType.Value,
-                        Confidence = b.Confidence,
-                        Text = b.Text,
-                        Geometry = b.Geometry
-                    });
+                        filtered.Add(new
+                        {
+                            BlockType = b.BlockType.Value,
+                            Confidence = b.Confidence,
+                            Text = b.Text,
+                            Geometry = b.Geometry
+                        });
+                    }
                 }
             }
+            catch (Exception ex)
+            {
+                await SafeAuditAsync($"Exception error: {ex.ToString()}", AuditLogLevel.Error, AuditEventType.TextractContext);
+
+            }
+
             return new Dictionary<string, object> { ["Blocks"] = filtered };
+
         }
 
         /// <summary>
@@ -188,6 +159,7 @@ namespace AppCore.Services
             byte[] bytes = await File.ReadAllBytesAsync(doc.DocumentPath, ct);
 
             // Upload using your IS3Service overload that accepts byte[]
+
             await _s3Service
                 .PutObjectAsync(bucket, key, bytes, ct)
                 .ConfigureAwait(false);
@@ -207,8 +179,8 @@ namespace AppCore.Services
                 JobTag = $"doc-{doc.Id}",
             };
 
-            var client = await GetClientAsync(ct).ConfigureAwait(false);
-            var response = await client.StartDocumentTextDetectionAsync(request, ct).ConfigureAwait(false);
+            var _textractClient = await _factory.GetTextractClientAsync(ct).ConfigureAwait(false);
+            var response = await _textractClient.StartDocumentTextDetectionAsync(request, ct).ConfigureAwait(false);
 
             await SafeAuditAsync(
                 $"Textract job started. JobId: {response.JobId}, s3://{bucket}/{key}",
@@ -222,7 +194,7 @@ namespace AppCore.Services
         /// </summary>
         public async Task<GetDocumentTextDetectionResponse> PollJobUntilCompleteAsync(string jobId, CancellationToken ct)
         {
-            var client = await GetClientAsync(ct).ConfigureAwait(false);
+            var _textractClient = await _factory.GetTextractClientAsync(ct).ConfigureAwait(false);
 
             var pollCfg = _cfg.GetSection("AWS:Textract:Poll");
             var maxWait = TimeSpan.FromMinutes(pollCfg.GetValue("MaxWaitMinutes", 30));
@@ -236,7 +208,7 @@ namespace AppCore.Services
             {
                 ct.ThrowIfCancellationRequested();
 
-                var res = await client.GetDocumentTextDetectionAsync(new GetDocumentTextDetectionRequest
+                var res = await _textractClient.GetDocumentTextDetectionAsync(new GetDocumentTextDetectionRequest
                 {
                     JobId = jobId,
                     MaxResults = 1000
@@ -263,7 +235,7 @@ namespace AppCore.Services
         /// </summary>
         public async Task<GetDocumentTextDetectionResponse> FetchAllTextBlocksAsync(string jobId, CancellationToken ct)
         {
-            var client = await GetClientAsync(ct).ConfigureAwait(false);
+            var _textractClient = await _factory.GetTextractClientAsync(ct).ConfigureAwait(false);
 
             var allBlocks = new List<Block>(capacity: 1024);
             string? nextToken = null;
@@ -271,7 +243,7 @@ namespace AppCore.Services
 
             do
             {
-                var resp = await client.GetDocumentTextDetectionAsync(new GetDocumentTextDetectionRequest
+                var resp = await _textractClient.GetDocumentTextDetectionAsync(new GetDocumentTextDetectionRequest
                 {
                     JobId = jobId,
                     NextToken = nextToken,

@@ -9,8 +9,8 @@ namespace AppCore.Interfaces
 {
     public interface ITextractService
     {
-        Task<TextractResult> AnalyzeAsync(string s3Bucket, string s3Key, CancellationToken ct);
-        Task<TextractResult> AnalyzeBytesAsync(byte[] bytes, CancellationToken ct); // small docs
+        //Task<TextractResult> AnalyzeAsync(string s3Bucket, string s3Key, CancellationToken ct);
+        //Task<TextractResult> AnalyzeBytesAsync(byte[] bytes, CancellationToken ct);
         Task<Dictionary<string, object>> DetectLinesAsync(string imagePath, CancellationToken ct);
     }
 

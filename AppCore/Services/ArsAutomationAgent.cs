@@ -5,7 +5,10 @@ namespace AppCore.Services
 {
     public class ArsAutomationAgent : IArsAutomationAgent
     {
-        private const string BaseUrl = "https://rlaars-uat.wlife.com.au:8078/ars/";
+        //private const string BaseUrl = "https://rlaars-uat.wlife.com.au:8078/ars/";
+        private const string BaseUrl = "https://rlaars.wlife.com.au:8078/ars/";
+        private string searchType = "FOLDER";
+
         private const string DownloadFolder = @"C:\Temp\ARSDownloads";
 
         public async Task ExecuteAsync(List<string> documentIds)
@@ -17,7 +20,9 @@ namespace AppCore.Services
             await using var browser = await playwright.Chromium.LaunchAsync(
                 new BrowserTypeLaunchOptions
                 {
-                    Headless = true
+                    ExecutablePath = @"C:\Program Files\Google\Chrome\Application\chrome.exe",
+                     Headless = false,
+                    SlowMo = 300,
                 });
 
             var context = await browser.NewContextAsync(new BrowserNewContextOptions
@@ -37,8 +42,8 @@ namespace AppCore.Services
             // ----------------------------------------------------
             // 2️⃣ Login
             // ----------------------------------------------------
-            await page.FillAsync("#form-username", "your-userid");
-            await page.FillAsync("#form-password", "your-password");
+            await page.FillAsync("#form-username", "SRIGOV");
+            await page.FillAsync("#form-password", "Holt@14000");
 
             await page.ClickAsync("#liSearch");
 
@@ -53,38 +58,111 @@ namespace AppCore.Services
             {
                 Console.WriteLine($"Processing: {documentId}");
 
-                await page.FillAsync("#DocumentId", documentId);
-                await page.PressAsync("#DocumentId", "Enter");
+                switch (searchType)
+                {
+                    case "DOCUMENT":
+                        await page.FillAsync("#DocumentId", documentId);
+                        await page.PressAsync("#DocumentId", "Enter");
+                        break;
+                    case "FOLDER":
+                        await page.FillAsync("#FolderId", documentId);
+                        await page.PressAsync("#FolderId", "Enter");
+                        break;
+                    default:
+                        Console.WriteLine($"Unknown search type: {searchType}. Defaulting to DOCUMENT.");
+                        await page.ClickAsync("#searchTypeDocument");
+                        break;
+                }
 
-                await page.WaitForSelectorAsync("#s3SearchResult");
-                await page.WaitForSelectorAsync("#s3SearchResult tbody tr");
+                await page.WaitForSelectorAsync("#s3SearchResult tbody tr",
+                new PageWaitForSelectorOptions
+                {
+                    State = WaitForSelectorState.Visible,
+                    Timeout = 10000
+                });
 
                 var rows = await page.QuerySelectorAllAsync("#s3SearchResult tbody tr");
 
-                if (rows.Count == 0)
+                int rowCount = rows.Count();
+
+                if (rowCount == 0)
                 {
                     Console.WriteLine("No results found.");
                     await page.FillAsync("#DocumentId", "");
                     continue;
                 }
-
-                foreach (var row in rows)
+                int rowIndex = 0;
+                for (int i = 0; i < rowCount; i++)
                 {
-                    var link = await row.QuerySelectorAsync("td:nth-child(1) a");
-                    if (link == null)
+                    var row = rows[i];
+                    rowIndex = i + 1; // For user-friendly indexing in logs
+
+                    // 1Get document id from column 4
+                    var documentIdElement = await row.QuerySelectorAsync("td:nth-child(4)");
+                    var documentPart = documentIdElement != null
+                      ? SanitizeFileName((await documentIdElement.InnerTextAsync()).Trim())
+                      : "UnknownDocument";
+
+                    // 1Get file type name from column 13
+                    var fileTypeElement = await row.QuerySelectorAsync("td:nth-child(13)");
+                    var extensionPart = fileTypeElement != null
+                      ? SanitizeFileName((await fileTypeElement.InnerTextAsync()).Trim())
+                      : "UnknownDocument";
+
+                    // 1️⃣ Get document name from column 12
+                    var documentNameElement = await row.QuerySelectorAsync("td:nth-child(12)");
+
+                    var documentName = documentNameElement != null
+                        ? SanitizeFileName((await documentNameElement.InnerTextAsync()).Trim())
+                        : "UnknownDocument";
+
+                    // 2️⃣ Get download link from column 1
+                    var downloadLink = await row.QuerySelectorAsync("td:nth-child(1) a");
+
+                    if (downloadLink == null)
                         continue;
 
+                    // 3️⃣ Trigger download
                     var download = await page.RunAndWaitForDownloadAsync(async () =>
                     {
-                        await link.ClickAsync();
+                        await downloadLink.ClickAsync();
                     });
 
-                    var savePath = Path.Combine(DownloadFolder, download.SuggestedFilename);
+                    string suggestedFileName = string.Empty;
+                    switch (searchType)
+                    {
+                        case "DOCUMENT":
+                            suggestedFileName = $"ARS_{documentPart}_{rowIndex}.{extensionPart}";
 
-                    await download.SaveAsAsync(savePath);
+                            break;
+                        case "FOLDER":
+                            suggestedFileName = $"ARS_{documentId}_{documentPart}_{rowIndex}.{extensionPart}";
 
-                    Console.WriteLine($"Downloaded: {download.SuggestedFilename}");
+                            break;
+                        default:
+                            Console.WriteLine($"Unknown search type: {searchType}. Defaulting to DOCUMENT.");
+                            await page.ClickAsync("#searchTypeDocument");
+                            break;
+                    }
+
+                    // 4️⃣ Save using document name
+                    //var extension = Path.GetExtension(download.SuggestedFilename);
+                    //var finalPath = Path.Combine(DownloadFolder, documentName + extension);
+
+                    var finalPath = Path.Combine(DownloadFolder, suggestedFileName);
+
+                    await download.SaveAsAsync(finalPath);
+
+                    //Console.WriteLine($"Saved as: {documentName + extension}");
+                    Console.WriteLine($"Saved as: {suggestedFileName}");
+
                 }
+
+                // 🔄 Refresh page for next documentId
+                await page.ReloadAsync();
+
+                // Wait until input becomes enabled again
+                await page.WaitForSelectorAsync("#DocumentId:not([disabled])");
 
                 // Clear input for next iteration
                 await page.FillAsync("#DocumentId", "");
@@ -98,6 +176,14 @@ namespace AppCore.Services
             await page.WaitForLoadStateAsync(LoadState.NetworkIdle);
 
             await browser.CloseAsync();
+        }
+
+        private string SanitizeFileName(string fileName)
+        {
+            foreach (char c in Path.GetInvalidFileNameChars())
+                fileName = fileName.Replace(c, '_');
+
+            return fileName;
         }
     }
 }

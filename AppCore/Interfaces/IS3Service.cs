@@ -19,7 +19,7 @@ namespace AppCore.Interfaces
     {
         Task<XElement> GetObjectMetadataAsync(string bucketName, string s3Key, CancellationToken cancellationToken);
         Task PutObjectAsync(string bucketName, string s3Key, byte[] data, CancellationToken cancellationToken);
-        Task PutObjectAsync(string bucketName, string s3Key, MemoryStream data, CancellationToken cancellationToken);
+        Task PutObjectV1Async(string bucketName, string s3Key, string filePath, CancellationToken cancellationToken);
         Task<string> DownloadPdfAsync(string bucket, string key, CancellationToken cancellationToken);
     }
 }

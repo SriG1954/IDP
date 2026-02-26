@@ -1,0 +1,75 @@
+﻿@page "/prompts/edit/{id:int}"
+@using AppCore.EntityModels
+@using AppCore.Interfaces
+@inject IPromptRepository _repo
+@inject NavigationManager Nav
+@rendermode InteractiveServer
+
+<h4>Edit Prompt</h4>
+
+@if (model is null)
+{
+    <p>Loading...</p>
+}
+else
+{
+    <EditForm Model="model" OnValidSubmit="HandleSubmit">
+        <DataAnnotationsValidator />
+        <ValidationSummary />
+
+        <div class="mb-3">
+            <label>Id</label>
+            <InputNumber class="form-control" @bind-Value="model.PromptId" Disabled />
+        </div>
+        <div class="mb-3">
+            <label>Name</label>
+            <InputText class="form-control" @bind-Value="model.Name" />
+        </div>
+        <div class="mb-3">
+            <label>Content</label>
+            <InputTextArea class="form-control" @bind-Value="model.Content" rows="10" />
+        </div>
+        <div class="mb-3">
+            <label>Version</label>
+            <InputNumber class="form-control" @bind-Value="model.Version" />
+        </div>
+        <div class="form-check mb-3">
+            <InputCheckbox class="form-check-input" @bind-Value="model.IsActive" />
+            <label class="form-check-label">Active</label>
+        </div>
+       @*  <div class="mb-3">
+            <label>Updated (UTC)</label>
+            <InputText class="form-control" Value="@model.UpdatedAtUtc.ToString()" Disabled />
+        </div> *@
+
+        <button class="btn btn-primary" type="submit">Save</button>
+        <button class="btn btn-danger" type="button" @onclick="DeleteAsync">Delete</button>
+        <button class="btn btn-secondary" type="button" @onclick="Cancel">Cancel</button>
+    </EditForm>
+}
+
+@code {
+    [Parameter] public int id { get; set; }
+    private Prompt1? model;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        model = await _repo.GetAsync(id);
+        await Task.Delay(100); // Simulate loading delay
+    }
+    // model = await _repo.GetAsync(id);
+
+    private async Task HandleSubmit()
+    {
+        await _repo.UpdateAsync(model!);
+        Nav.NavigateTo("/prompts");
+    }
+
+    private async Task DeleteAsync()
+    {
+        await _repo.DeleteAsync(model!);
+        Nav.NavigateTo("/prompts");
+    }
+
+    private void Cancel() => Nav.NavigateTo("/prompts");
+}
