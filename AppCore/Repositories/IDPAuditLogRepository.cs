@@ -74,8 +74,7 @@ namespace AppCore.Repositories
                 {
                     EntityId = entityid,
                     BatchId = batchid,
-                    BulkCopyId = null,
-                    DeleteId = null,
+                    DocumentId = null,
                     Message = message!,
                     CreatedAt = DateTime.UtcNow,
                     CreatedBy = "System",

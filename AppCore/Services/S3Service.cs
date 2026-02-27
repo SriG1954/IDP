@@ -1,6 +1,7 @@
 ﻿using Amazon;
 using Amazon.S3;
 using Amazon.S3.Model;
+using AppCore.EntityModels;
 using AppCore.Interfaces;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;

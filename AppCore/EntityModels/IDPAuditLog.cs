@@ -15,9 +15,7 @@ namespace AppCore.EntityModels
 
         public long? BatchId { get; set; }
 
-        public long? BulkCopyId { get; set; }
-
-        public long? DeleteId { get; set; }
+        public long? DocumentId { get; set; }
 
         public AuditEventType EventType { get; set; }
 
@@ -28,6 +26,30 @@ namespace AppCore.EntityModels
         public DateTime CreatedAt { get; set; }
 
         public string? CreatedBy { get; set; }
+    }
+
+    public enum AuditLogLevel
+    {
+        Trace = 0,      // Detailed, debug info
+        Info = 1,       // Normal process events
+        Warning = 2,    // Recoverable issues, retries
+        Error = 3,      // Failures requiring attention
+        Critical = 4    // Process-stopping issues
+    }
+
+    public enum AuditEventType
+    {
+        System = 0,
+        Testing = 1,
+        FetchEmailMessage = 2,
+        AWSContext = 3,
+        TextractContext = 4,
+        SQLContext = 5,
+        S3Context = 6,
+        HardDelet = 7,
+        HDReverse = 8,
+        HDVerifiy = 9,
+        HDService = 11,
     }
 
 }

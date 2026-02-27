@@ -6,6 +6,7 @@ using Amazon.SageMakerRuntime;
 using Amazon.SecurityToken;
 using Amazon.SecurityToken.Model;
 using Amazon.Textract;
+using AppCore.EntityModels;
 using AppCore.Interfaces;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;

@@ -18,6 +18,13 @@ public partial class AppDbContext : DbContext
     {
     }
 
+    public virtual DbSet<IDPBatch> IDPBatches { get; set; }
+    public virtual DbSet<IDPDocumentClassification> IDPDocumentClassifications { get; set; }
+    public virtual DbSet<IDPDocument> IDPDocuments { get; set; }
+    public virtual DbSet<IDPDocumentContent> IDPDocumentContents { get; set; }
+    public virtual DbSet<IDPHumanReview> IDPHumanReviews { get; set; }
+    public virtual DbSet<IDPTrainingData> IDPTrainingDatas { get; set; }
+
     public virtual DbSet<IDPAuditLog> IDPAuditLogs { get; set; }
 
     public virtual DbSet<Aillmresponse> Aillmresponses { get; set; }
@@ -94,15 +101,48 @@ public partial class AppDbContext : DbContext
     public virtual DbSet<DocumentJob> DocumentJobs => Set<DocumentJob>();
     public virtual DbSet<DocumentResult> DocumentResults => Set<DocumentResult>();
 
-    //protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
-    //    => optionsBuilder.UseSqlServer("Server=WLF1N1TAZSQLCLU.wlife.com.au;Database=IDPDEV;User Id=ARSUser;Password=hjytu73k48jk23!;TrustServerCertificate=True;");
-
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.Entity<IDPAuditLog>(entity =>
         {
             entity.HasKey(e => e.LogId);
             entity.ToTable("IDPAuditLog");
+        });
+
+        modelBuilder.Entity<IDPBatch>(entity =>
+        {
+            entity.HasKey(e => e.BatchId);
+            entity.ToTable("IDPBatch");
+        });
+
+        modelBuilder.Entity<IDPDocument>(entity =>
+        {
+            entity.HasKey(e => e.DocumentId);
+            entity.ToTable("IDPDocument");
+        });
+
+        modelBuilder.Entity<IDPDocumentClassification>(entity =>
+        {
+            entity.HasKey(e => e.ClassificationId);
+            entity.ToTable("IDPDocumentClassification");
+        });
+
+        modelBuilder.Entity<IDPDocumentContent>(entity =>
+        {
+            entity.HasKey(e => e.DocumentId);
+            entity.ToTable("IDPDocumentContent");
+        });
+
+        modelBuilder.Entity<IDPHumanReview>(entity =>
+        {
+            entity.HasKey(e => e.ReviewId);
+            entity.ToTable("IDPHumanReview");
+        });
+
+        modelBuilder.Entity<IDPTrainingData>(entity =>
+        {
+            entity.HasKey(e => e.TrainingId);
+            entity.ToTable("IDPTrainingData");
         });
 
         modelBuilder.Entity<Aillmresponse>(entity =>
@@ -645,7 +685,6 @@ public partial class AppDbContext : DbContext
             entity.ToTable("MailRecipients");
         });
 
-
         modelBuilder.Entity<EntityModels.MailAttachment>(entity =>
         {
             entity.HasKey(e => e.MailAttachmentId);
@@ -916,11 +955,13 @@ public partial class AppDbContext : DbContext
             entity.HasKey(e => e.CatalogId);
             entity.ToTable("WorktypeCatalogs");
         });
+
         modelBuilder.Entity<PhraseOverride>(entity =>
         {
             entity.HasKey(e => e.OverrideId);
             entity.ToTable("PhraseOverrides");
         });
+
         modelBuilder.Entity<CheckboxFlagRule>(entity =>
         {
             entity.HasKey(e => e.RuleId);

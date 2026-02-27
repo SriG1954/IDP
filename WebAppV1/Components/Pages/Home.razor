@@ -5,13 +5,13 @@
 @using AppCore.EntityModels
 @using AppCore.Services
 @inject IConfiguration _config;
-@inject IArsAutomationAgent _playright
-@inject IIDPAuditLogRepository _audit;
+@inject IBatchService _batch;
+
+@* @inject IIDPAuditLogRepository _audit;
 @inject IEmailSerivce _email;
 @inject ITextractService _textract;
-@inject IVLMService _llm;
-@inject ArsAutomationAgent _ars;
-@inject IConfiguration _configuration
+@inject IVLMService _llm; 
+@inject ArsAutomationAgent _ars;*@
 @inject IJSRuntime JS
 @inject NavigationManager Nav
 @rendermode @(new InteractiveServerRenderMode(prerender: false))
@@ -33,11 +33,9 @@ Welcome to your new app.
 
         try
         {
-            // List<string> documentids = new List<string>();
-            // documentids.Add("639066");
+            await _batch.ExecuteAsync(ctn).ConfigureAwait(false);
 
-            // test log
-            await _audit.AddLogAsync(0, 1, $"Home- test logging at: {DateTime.Now.ToString()}", AuditLogLevel.Info, AuditEventType.Testing);
+            //await _audit.AddLogAsync(0, 1, $"Home- test logging at: {DateTime.Now.ToString()}", AuditLogLevel.Info, AuditEventType.Testing);
 
             // List<string> documentids = new List<string>();
             // //documentids.Add("639066");
@@ -67,28 +65,28 @@ Welcome to your new app.
                 //---------------------------------------
                 // test textract
                 //---------------------------------------
-                string imagePath = @"C:\IDP\TestImages\Picture5.jpg";
-                var textractResult = await _textract.DetectLinesAsync(imagePath, ctn);
+                // string imagePath = @"C:\IDP\TestImages\Picture5.jpg";
+                // var textractResult = await _textract.DetectLinesAsync(imagePath, ctn);
 
-                //---------------------------------------
-                // test sagemaker
-                //---------------------------------------
-                string endpointName = _config["AWSDTS:LLMEndpoint"] ?? throw new InvalidOperationException("AWSDTS:LLMEndpoint is required");
-                string KV_BASE_INSTRUCTIONS = _config["AWSDTS:KV_BASE_INSTRUCTIONS"] ?? throw new InvalidOperationException("AWSDTS:LLMPrompt is required");
+                // //---------------------------------------
+                // // test sagemaker
+                // //---------------------------------------
+                // string endpointName = _config["AWSDTS:LLMEndpoint"] ?? throw new InvalidOperationException("AWSDTS:LLMEndpoint is required");
+                // string KV_BASE_INSTRUCTIONS = _config["AWSDTS:KV_BASE_INSTRUCTIONS"] ?? throw new InvalidOperationException("AWSDTS:LLMPrompt is required");
 
-                var KVPrompt = await File.ReadAllTextAsync(KV_BASE_INSTRUCTIONS);
-                var KVResponse = await _llm.CallKvAsync(endpointName, KVPrompt, textractResult, imagePath, 1500, 0.1, ctn);
-                Console.WriteLine(KVResponse);
+                // var KVPrompt = await File.ReadAllTextAsync(KV_BASE_INSTRUCTIONS);
+                // var KVResponse = await _llm.CallKvAsync(endpointName, KVPrompt, textractResult, imagePath, 1500, 0.1, ctn);
+                // Console.WriteLine(KVResponse);
 
-                string WORKTYPE_CATALOG = _config["AWSDTS:WORKTYPE_CATALOG"] ?? throw new InvalidOperationException("AWSDTS:LLMPrompt is required");
-                string CLASSIFIER_INSTRUCTIONS = _config["AWSDTS:CLASSIFIER_INSTRUCTIONS"] ?? throw new InvalidOperationException("AWSDTS:LLMPrompt is required");
+                // string WORKTYPE_CATALOG = _config["AWSDTS:WORKTYPE_CATALOG"] ?? throw new InvalidOperationException("AWSDTS:LLMPrompt is required");
+                // string CLASSIFIER_INSTRUCTIONS = _config["AWSDTS:CLASSIFIER_INSTRUCTIONS"] ?? throw new InvalidOperationException("AWSDTS:LLMPrompt is required");
 
-                var worktypeCatlog = await File.ReadAllTextAsync(WORKTYPE_CATALOG);
-                var classifierInstructions = await File.ReadAllTextAsync(CLASSIFIER_INSTRUCTIONS);
+                // var worktypeCatlog = await File.ReadAllTextAsync(WORKTYPE_CATALOG);
+                // var classifierInstructions = await File.ReadAllTextAsync(CLASSIFIER_INSTRUCTIONS);
 
-                string classifierResponse = await _llm.CallClassifierAsync(endpointName, KVResponse, worktypeCatlog, imagePath, classifierInstructions, 1500, 0.1, ctn);
+                // string classifierResponse = await _llm.CallClassifierAsync(endpointName, KVResponse, worktypeCatlog, imagePath, classifierInstructions, 1500, 0.1, ctn);
 
-                Console.WriteLine(classifierResponse);
+                // Console.WriteLine(classifierResponse);
             }
 
             await Task.Delay(100);

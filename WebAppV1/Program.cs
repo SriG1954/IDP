@@ -81,6 +81,9 @@ builder.Services.AddScoped<IArsAutomationAgent, ArsAutomationAgent>();
 builder.Services.AddMemoryCache();
 builder.Services.AddScoped<IPromptRepository, PromptRepository>();
 
+// Batch Service
+builder.Services.AddScoped<IBatchService, BatchService>();
+
 builder.Services.AddAuthentication(NegotiateDefaults.AuthenticationScheme)
     .AddNegotiate();
 
